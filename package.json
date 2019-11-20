@@ -1,0 +1,45 @@
+{
+  "name": "roughset-js",
+  "version": "1.0.0",
+  "description": "JS Framework for Roughset",
+  "main": "dist/roughset.js",
+  "scripts": {
+    "test": "jest",
+    "dev": "webpack --mode=development ",
+    "build": "webpack --mode=production --output-filename=roughset.min.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/affandes/roughset-js.git"
+  },
+  "keywords": [
+    "roughset",
+    "js",
+    "framework"
+  ],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
+  "author": {
+    "name": "Muhammad Affandes",
+    "email": "affandes@gmail.com",
+    "web": "https://twitter.com/affandes"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/affandes/roughset-js/issues"
+  },
+  "homepage": "https://github.com/affandes/roughset-js#readme",
+  "devDependencies": {
+    "@babel/core": "^7.6.2",
+    "@babel/preset-env": "^7.6.2",
+    "babel-jest": "^24.9.0",
+    "jest": "^24.9.0",
+    "webpack": "^4.41.0",
+    "webpack-cli": "^3.3.9"
+  }
+}
