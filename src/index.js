@@ -57,12 +57,21 @@ var RoughSetJs = function () {
     let dictionary = [];
 
     // Step 1 - Discretization
-    let isDiscretization = false;
-    let itemsDisc = [];
+    let hasDiscretized = false;
+    let itemsDiscretized = [];
 
     // Step 2 - Indiscernibility Relations
-    let isInd = false;
-    let indiscernibility = [];
+    let indiscernibilityAll = null;
+    let indiscernibilitySubstract = [];
+
+    // Step 3 - Indispensable
+    let hasFindIndipensable = false;
+    let dispensable = [];
+    let indispensable = [];
+    let substractAttributes = [];
+
+    let hasFindReduct = false;
+    let reductList = [];
 
     function isValidItems(values) {
         if( !Array.isArray(values) ) {
@@ -160,6 +169,10 @@ var RoughSetJs = function () {
 
     function discretization() {
         let values = items;
+        if( items.length === 0 ) {
+            console.error('Please set items first!');
+            return
+        }
         if( hasNonNumeric ) {
             for (let i = 0; i < values.length; i++) {
                 for (let j = 0; j < values[i].length; j++) {
@@ -177,7 +190,8 @@ var RoughSetJs = function () {
                 }
             }
         }
-        itemsDisc = values
+        itemsDiscretized = values;
+        hasDiscretized = true;
     }
 
     /**
@@ -189,20 +203,22 @@ var RoughSetJs = function () {
      */
     function findIndiscernibility(values = []) {
 
-        discretization();
-
         let results = {classes: [], keys: [], relations: [], decisions: [], conflicts: []};
         values = Array.isArray(values) ? values : [];
 
-        itemsDisc[0].forEach((v,k) => {
+        if( !hasDiscretized ) {
+            discretization();
+        }
+
+        itemsDiscretized[0].forEach((v,k) => {
             if( k !== decisionIndex && (values.length === 0 || values.indexOf(attributes[k]) >= 0) ) {
                 results.keys.push(k)
             }
         });
 
-        for (let i = 0; i < itemsDisc.length; i++) {
+        for (let i = 0; i < itemsDiscretized.length; i++) {
             let keyHash = 'R';
-            itemsDisc[i].forEach((v,k) => {
+            itemsDiscretized[i].forEach((v,k) => {
                 if( k !== decisionIndex && results.keys.indexOf(k) >= 0 ) {
                     keyHash += '_' + v;
                 }
@@ -216,13 +232,113 @@ var RoughSetJs = function () {
                 results.relations[idx].push(i)
             }
             if( results.decisions[idx] === undefined ) {
-                results.decisions.push(itemsDisc[i][decisionIndex])
-            } else if( results.decisions[idx] !== itemsDisc[i][decisionIndex] ) {
+                results.decisions.push(itemsDiscretized[i][decisionIndex])
+            } else if( results.decisions[idx] !== itemsDiscretized[i][decisionIndex] ) {
                 results.conflicts.push(idx)
             }
         }
         return results
 
+    }
+
+    function generateAttributeSubstract() {
+        let attr = attributes;
+        let results = [];
+        for (let i = 0; i < attr.length-1; i++) {
+            attr.forEach((v,k) => {
+                if( i !== k && decisionIndex !== k ) {
+                    if( results[i] === undefined ) {
+                        results[i] = [v];
+                    } else {
+                        results[i].push(v)
+                    }
+                }
+            })
+        }
+        return results;
+    }
+
+    function findIndispensable() {
+        if( !isValidInformationSystem({ U: items, A: attributes }) ) {
+            return
+        }
+
+        let attr = attributes;
+        let attrSubstract = generateAttributeSubstract();
+        substractAttributes = attrSubstract;
+        indiscernibilityAll = findIndiscernibility(attr);
+
+        dispensable = [];
+        indispensable = [];
+
+        for (let i = 0; i < attrSubstract.length; i++) {
+            let curr = findIndiscernibility(attrSubstract[i]);
+            let isIndispensable = false;
+            if( curr.conflicts.length > 0 ) {
+                if( curr.conflicts.length > indiscernibilityAll.conflicts.length ) {
+                    isIndispensable = true;
+                }
+            }
+            if( !isIndispensable ) {
+                dispensable.push(i)
+            } else {
+                indispensable.push(i)
+            }
+            indiscernibilitySubstract.push(curr)
+        }
+
+        hasFindIndipensable = true
+    }
+
+    function findReduct() {
+        if( !hasFindIndipensable ) {
+            findIndispensable()
+        }
+        let indipensableAttr = indispensable.map((x) => attributes[x]);
+
+        // Cek reduct for indispensable
+        let indiscernibilityIndispensable = findIndiscernibility(indipensableAttr);
+        let isReduct = indiscernibilityIndispensable.conflicts.length === 0;
+
+        if( isReduct ) {
+            reductList.push(indispensable);
+        } else {
+            let isReductFounds = false;
+            for (let i = 0; i < dispensable.length; i++) {
+                let reductCandidate = generateCandidate(dispensable.length, i+1, 0);
+                for (let j = 0; j < reductCandidate.length; j++) {
+                    let dispensableCandidate = reductCandidate[j].map((id) => {return dispensable[id]});
+                    let testIndex = indispensable.concat(dispensableCandidate);
+                    let testAttr = testIndex.map((id) => { return attributes[id] });
+                    let indiscernibilityCandidate = findIndiscernibility(testAttr);
+                    if( indiscernibilityCandidate.conflicts.length === 0 ) {
+                        reductList.push(testIndex);
+                        isReductFounds = true;
+                    }
+                }
+                if( isReductFounds ) {
+                    break
+                }
+            }
+        }
+
+        hasFindReduct = true;
+
+    }
+
+    function generateCandidate(totalData, pick, startFrom) {
+        let candidate = [];
+        for (let i = startFrom; i < totalData + 1 - pick; i++) {
+            if( pick <= 1 ) {
+                candidate.push([i])
+            } else {
+                let next = generateCandidate(totalData, pick-1, i+1);
+                next.forEach((v) => {
+                    candidate.push([i].concat(v))
+                });
+            }
+        }
+        return candidate;
     }
 
     this.getItems = function() {
@@ -285,17 +401,57 @@ var RoughSetJs = function () {
         }
     };
 
-    this.hasNonNumeric = function () {
+    this.getHasNonNumeric = function () {
         return hasNonNumeric
     };
 
-    this.getIndiscernibility = function(attr) {
-        if( !isInd ) {
-            indiscernibility = findIndiscernibility(attr);
-            isInd = true
-        }
-        return indiscernibility
+    this.getDictionary = function () {
+        return dictionary
     };
+
+    this.getHasDiscretized = function () {
+        return hasDiscretized
+    };
+
+    this.getItemsDiscretized = function () {
+        return itemsDiscretized
+    };
+
+    this.getIndiscernibilityAll = function () {
+        return indiscernibilityAll
+    };
+
+    this.getIndiscernibilitySubstract = function () {
+        return indiscernibilitySubstract
+    };
+
+    this.getHasFindIndispensable = function () {
+        return hasFindIndipensable
+    };
+
+    this.getIndispensable = function() {
+        return indispensable
+    };
+
+    this.getDispensable = function() {
+        return dispensable
+    };
+
+    this.getSubstractAttributes = function () {
+        return substractAttributes
+    };
+
+    this.getHasFindReduct = function () {
+        return hasFindReduct
+    };
+
+    this.getReductList = function () {
+        return reductList
+    };
+
+    this.reduct = function () {
+        findReduct()
+    }
 
 };
 
